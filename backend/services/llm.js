@@ -3,7 +3,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export async function* getStreamingResponse(messages, model, temperature = 0.7, maxTokens = 1024) {
-    const modelId = model || process.env.HF_MODEL || 'llama3-8b-8192';
+    let modelId = model || process.env.GROQ_MODEL || 'llama-4-scout-17b-16e-instruct';
+    
+    // Normalize model ID for Groq (removes HF prefix if present)
+    if (modelId.startsWith('meta-llama/')) {
+        modelId = modelId.replace('meta-llama/', '');
+    }
 
     try {
         const response = await fetch(

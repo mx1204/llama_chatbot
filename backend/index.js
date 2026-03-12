@@ -20,7 +20,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'healthy', model: process.env.HF_MODEL });
+    res.json({ status: 'healthy', model: process.env.GROQ_MODEL });
 });
 
 app.post('/chat', async (req, res) => {
