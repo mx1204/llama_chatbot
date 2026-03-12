@@ -7,6 +7,18 @@ export async function* getStreamingResponse(messages, model, temperature = 0.7, 
     
     // Use the model ID as-is. Groq expects the full path for certain models like Llama 4.
 
+    const SYSTEM_PROMPT = `You are a helpful AI assistant.
+Always format your responses using markdown:
+- Use **bold** for important terms and key points
+- Use ## for main section headings
+- Use ### for sub headings
+- Use bullet points for lists
+- Use numbered lists for step by step instructions
+- Use code blocks for any code examples
+Write naturally and never mention, explain,
+or show markdown syntax to the user.
+Just use it silently to format your response.`;
+
     try {
         const response = await fetch(
             'https://api.groq.com/openai/v1/chat/completions',
@@ -18,7 +30,10 @@ export async function* getStreamingResponse(messages, model, temperature = 0.7, 
                 },
                 body: JSON.stringify({
                     model: modelId,
-                    messages: messages,
+                    messages: [
+                        { role: 'system', content: SYSTEM_PROMPT },
+                        ...messages
+                    ],
                     max_tokens: maxTokens,
                     temperature: temperature,
                     stream: true,
