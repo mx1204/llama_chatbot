@@ -1,9 +1,7 @@
 :root {
-  --primary-color: #3b82f6; /* Blue 500 */
+  --primary-color: #3b82f6;
   --bg-light: #f8fafc;
   --bg-dark: #1a1a2e;
-  --bubble-ai-light: #f1f5f9;
-  --bubble-ai-dark: #2d2d44;
   --text-light: #1e293b;
   --text-dark: #f1f5f9;
 }
@@ -11,40 +9,22 @@
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Base Container */
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.app-container.light {
-  background-color: var(--bg-light);
-  color: var(--text-light);
-}
-
-.app-container.dark {
-  background-color: var(--bg-dark);
-  color: var(--text-dark);
+  overflow: hidden;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .message-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -53,32 +33,44 @@ body {
   background: #cbd5e1;
   border-radius: 10px;
 }
-.app-container.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
 }
 
-/* Typing Indicator Dots */
+/* Typing Indicator */
 .dot-bounce {
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 2px;
+  width: 5px;
+  height: 5px;
   background: currentColor;
   border-radius: 50%;
-  animation: bounce 1.4s infinite ease-in-out both;
+  animation: bounce 1.2s infinite ease-in-out both;
 }
 
 .dot-bounce:nth-child(1) { animation-delay: -0.32s; }
 .dot-bounce:nth-child(2) { animation-delay: -0.16s; }
 
 @keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1.0); }
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+  40% { transform: translateY(-4px); opacity: 1; }
 }
 
-/* Mobile Adjustments */
-@media (max-width: 640px) {
-  header h1 {
-    font-size: 1rem;
+/* Textarea auto-resize (manual handle in JS but CSS base) */
+textarea {
+  min-height: 56px;
+  line-height: 1.5;
+}
+
+/* Transitions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Responsive Hide for Sidebar */
+@media (max-width: 1024px) {
+  .sidebar-hidden {
+    transform: translateX(-100%);
   }
 }
