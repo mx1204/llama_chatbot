@@ -15,6 +15,10 @@ app.use(cors({
 
 app.use(express.json());
 
+app.get('/', (req, res) => {
+    res.send('Llama Chatbot Backend is running! Use /health for details.');
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'healthy', model: process.env.HF_MODEL });
 });
