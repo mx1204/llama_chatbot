@@ -9,7 +9,11 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGIN || 'http://localhost:3000',
+    origin: [
+        'http://localhost:5173',
+        'https://max-ai-bot.vercel.app',
+        'https://llama-chatbot-ten.vercel.app'
+    ],
     credentials: true,
 }));
 
