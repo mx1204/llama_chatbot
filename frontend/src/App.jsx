@@ -2,76 +2,62 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 function App() {
-  // --- STATE ---
   const [sessions, setSessions] = useState(() => {
-    const saved = localStorage.getItem('chat_sessions');
+    const saved = localStorage.getItem('maxai_sessions');
     return saved ? JSON.parse(saved) : [{ id: Date.now(), title: 'New Chat', messages: [] }];
   });
-  
+
   const [currentSessionId, setCurrentSessionId] = useState(() => {
-    const savedId = localStorage.getItem('current_session_id');
-    return savedId ? parseInt(savedId) : sessions[0].id;
+    const saved = localStorage.getItem('maxai_current');
+    const id = saved ? parseInt(saved) : null;
+    const s = localStorage.getItem('maxai_sessions');
+    const parsed = s ? JSON.parse(s) : [];
+    if (id && parsed.find(x => x.id === id)) return id;
+    return parsed.length > 0 ? parsed[0].id : Date.now();
   });
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved === 'true' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const saved = localStorage.getItem('maxai_dark');
+    return saved === 'true';
   });
 
   const messagesEndRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  const abortRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const currentSession = sessions.find(s => s.id === currentSessionId) || sessions[0];
-  const messages = currentSession.messages;
+  const messages = currentSession?.messages || [];
 
   const suggestions = [
     "What can you help me with?",
-    "Explain a complex topic in simple terms",
+    "Explain a complex topic simply",
     "Help me write a professional email",
-    "What are the latest trends in AI?"
+    "What are the latest trends in AI?",
   ];
 
-  // --- EFFECTS ---
-  useEffect(() => {
-    localStorage.setItem('chat_sessions', JSON.stringify(sessions));
-  }, [sessions]);
+  // Persist
+  useEffect(() => { localStorage.setItem('maxai_sessions', JSON.stringify(sessions)); }, [sessions]);
+  useEffect(() => { localStorage.setItem('maxai_current', currentSessionId); }, [currentSessionId]);
+  useEffect(() => { localStorage.setItem('maxai_dark', darkMode); }, [darkMode]);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('current_session_id', currentSessionId);
-    scrollToBottom();
-  }, [currentSessionId]);
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', darkMode);
-  }, [darkMode]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth <= 1024) setIsSidebarOpen(false);
-      else setIsSidebarOpen(true);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const onResize = () => { if (window.innerWidth <= 768) setSidebarOpen(false); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const getTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const getTime = () => {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // --- ACTIONS ---
   const createNewChat = () => {
-    const newId = Date.now();
-    const newSession = { id: newId, title: 'New Chat', messages: [] };
-    setSessions(prev => [newSession, ...prev]);
-    setCurrentSessionId(newId);
-    if (window.innerWidth <= 1024) setIsSidebarOpen(false);
+    const id = Date.now();
+    setSessions(prev => [{ id, title: 'New Chat', messages: [] }, ...prev]);
+    setCurrentSessionId(id);
+    if (window.innerWidth <= 768) setSidebarOpen(false);
   };
 
   const deleteSession = (id, e) => {
@@ -87,131 +73,99 @@ function App() {
     }
   };
 
-  const handleStopGenerating = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsLoading(false);
-    }
-  };
+  const stopGenerating = () => { abortRef.current?.abort(); setIsLoading(false); };
 
-  const handleSend = async (textToSend) => {
-    const messageText = textToSend || input;
-    if (!messageText.trim() || isLoading) return;
+  const handleSend = async (text) => {
+    const msg = text || input;
+    if (!msg.trim() || isLoading) return;
 
-    const userMsg = { 
-      role: 'user', 
-      content: messageText, 
-      timestamp: getTime() 
-    };
-    
-    // Update session messages and title if first message
+    const userMsg = { role: 'user', content: msg, timestamp: getTime() };
+
     setSessions(prev => prev.map(s => {
-      if (s.id === currentSessionId) {
-        const newMessages = [...s.messages, userMsg];
-        const newTitle = s.title === 'New Chat' ? messageText.substring(0, 30) + (messageText.length > 30 ? '...' : '') : s.title;
-        return { ...s, messages: newMessages, title: newTitle };
-      }
-      return s;
+      if (s.id !== currentSessionId) return s;
+      const title = s.title === 'New Chat' ? msg.slice(0, 32) + (msg.length > 32 ? '…' : '') : s.title;
+      return { ...s, title, messages: [...s.messages, userMsg] };
     }));
 
     setInput('');
     setIsLoading(true);
+    if (textareaRef.current) textareaRef.current.style.height = '52px';
 
-    const assistantMsg = { 
-      role: 'assistant', 
-      content: '', 
-      timestamp: getTime() 
-    };
-    
-    setSessions(prev => prev.map(s => 
+    const assistantMsg = { role: 'assistant', content: '', timestamp: getTime() };
+    setSessions(prev => prev.map(s =>
       s.id === currentSessionId ? { ...s, messages: [...s.messages, assistantMsg] } : s
     ));
 
-    abortControllerRef.current = new AbortController();
+    abortRef.current = new AbortController();
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: [...messages, userMsg].map(({role, content}) => ({role, content})) 
-        }),
-        signal: abortControllerRef.current.signal
+        body: JSON.stringify({ messages: [...messages, userMsg].map(({ role, content }) => ({ role, content })) }),
+        signal: abortRef.current.signal,
       });
 
-      const reader = response.body.getReader();
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let assistantContent = '';
+      let full = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-            try {
-              const { content } = JSON.parse(data);
-              assistantContent += content;
-              setSessions(prev => prev.map(s => {
-                if (s.id === currentSessionId) {
-                  const newMsgs = [...s.messages];
-                  newMsgs[newMsgs.length - 1].content = assistantContent;
-                  return { ...s, messages: newMsgs };
-                }
-                return s;
-              }));
-            } catch (e) {
-              console.error('Parsing error:', e);
-            }
-          }
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+          if (data === '[DONE]') break;
+          try {
+            const { content } = JSON.parse(data);
+            full += content;
+            setSessions(prev => prev.map(s => {
+              if (s.id !== currentSessionId) return s;
+              const msgs = [...s.messages];
+              msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content: full };
+              return { ...s, messages: msgs };
+            }));
+          } catch (_) {}
         }
       }
-    } catch (error) {
-      if (error.name === 'AbortError') return;
-      console.error('Chat error:', error);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
       setSessions(prev => prev.map(s => {
-        if (s.id === currentSessionId) {
-          const newMsgs = [...s.messages];
-          newMsgs[newMsgs.length - 1].content = 'Connection error. Please try again.';
-          return { ...s, messages: newMsgs };
-        }
-        return s;
+        if (s.id !== currentSessionId) return s;
+        const msgs = [...s.messages];
+        msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content: '⚠️ Connection error. Please try again.' };
+        return { ...s, messages: msgs };
       }));
     } finally {
       setIsLoading(false);
-      abortControllerRef.current = null;
+      abortRef.current = null;
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  // Helper to format code snippets simple-style
-  const formatContent = (content) => {
-    if (!content) return " ";
+  const autoResize = (e) => {
+    e.target.style.height = '52px';
+    e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+    setInput(e.target.value);
+  };
+
+  const renderContent = (content) => {
+    if (!content) return null;
     const parts = content.split('```');
     return parts.map((part, i) => {
-      if (i % 2 === 1) { // Code block
+      if (i % 2 === 1) {
         const lines = part.split('\n');
         const lang = lines[0].trim();
         const code = lines.slice(1).join('\n');
         return (
-          <div key={i} className="my-4 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-            <div className="bg-gray-100 dark:bg-gray-800 px-4 py-1 text-xs font-mono text-gray-500 flex justify-between uppercase">
-              <span>{lang || 'code'}</span>
-            </div>
-            <pre className="p-4 bg-gray-50 dark:bg-gray-900 overflow-x-auto text-xs font-mono">
-              <code>{code || lang}</code>
-            </pre>
+          <div key={i} className="code-block-wrapper">
+            <div className="code-block-header">{lang || 'code'}</div>
+            <pre className="code-block-content"><code>{code || lang}</code></pre>
           </div>
         );
       }
@@ -220,179 +174,124 @@ function App() {
   };
 
   return (
-    <div className={`flex w-full h-screen ${darkMode ? 'dark bg-[#1a1a2e]' : 'bg-[#f8fafc]'} transition-colors duration-200`}>
-      
-      {/* SIDEBAR */}
-      <aside className={`fixed lg:relative z-50 h-full bg-[#f1f5f9] dark:bg-[#0f172a] border-r border-gray-200 dark:border-gray-800 transition-all duration-300 flex flex-col ${isSidebarOpen ? 'w-full sm:w-[280px] left-0' : 'w-0 -left-full lg:left-0 lg:w-0 overflow-hidden'}`}>
-        
-        {/* Sidebar Header */}
-        <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
-          <button 
-            onClick={createNewChat}
-            className="flex-1 flex items-center gap-2 p-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-          >
-            <span className="text-lg">+</span> New Chat
+    <div className={`app-wrapper ${darkMode ? 'dark' : 'light'}`}>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && window.innerWidth <= 768 && (
+        <div className="sidebar-overlay visible" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? '' : 'closed'}`}>
+        <div className="sidebar-header">
+          <button className="new-chat-btn" onClick={createNewChat}>
+            <span>＋</span> New chat
           </button>
-          <button 
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden p-2 text-xl"
-          >
-            ✕
-          </button>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
 
-        {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          <div className="text-[10px] uppercase font-bold text-gray-400 px-2 py-4 tracking-widest">Recent Chats</div>
-          {sessions.map(session => (
-            <div 
-              key={session.id}
-              onClick={() => { setCurrentSessionId(session.id); if (window.innerWidth <= 1024) setIsSidebarOpen(false); }}
-              className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${session.id === currentSessionId ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+        <div className="sessions-list">
+          <div className="sessions-label">Recent</div>
+          {sessions.map(s => (
+            <div
+              key={s.id}
+              className={`session-item ${s.id === currentSessionId ? 'active' : ''}`}
+              onClick={() => { setCurrentSessionId(s.id); if (window.innerWidth <= 768) setSidebarOpen(false); }}
             >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <span className="text-sm">💬</span>
-                <span className="text-sm truncate font-medium">{session.title}</span>
-              </div>
-              <button 
-                onClick={(e) => deleteSession(session.id, e)}
-                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 p-1 text-xs"
-              >
-                🗑️
-              </button>
+              <span className="session-title">{s.title}</span>
+              <button className="session-delete" onClick={(e) => deleteSession(s.id, e)}>🗑</button>
             </div>
           ))}
         </div>
 
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-2">
-          <button 
-             onClick={() => setDarkMode(!darkMode)}
-             className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
-          >
-            <span>{darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}</span>
+        <div className="sidebar-footer">
+          <button className="theme-toggle-btn" onClick={() => setDarkMode(!darkMode)}>
+            {darkMode ? '☀️  Light mode' : '🌙  Dark mode'}
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        
-        {/* Header */}
-        <header className="sticky top-0 z-40 w-full h-14 border-b border-gray-200 dark:border-gray-800 bg-inherit flex items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
-              <span className="text-xl">☰</span>
-            </button>
-            <h2 className="text-sm font-semibold truncate max-w-[150px] sm:max-w-none">
-              {currentSession.title}
-            </h2>
+      {/* Main */}
+      <div className="main-area">
+        <header className="main-header">
+          <div className="header-left">
+            <button className="menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
+            <span className="header-title">Max's AI</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold px-2 py-1 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 uppercase tracking-tighter">
-              Llama 4
-            </span>
-            <div className="text-lg">🤖</div>
+          <div className="header-right">
+            <span className="model-badge">Llama 4 Scout</span>
           </div>
         </header>
 
-        {/* Messages */}
-        <main className="flex-1 overflow-y-auto w-full">
-          <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-            
+        <div className="messages-container">
+          <div className="messages-inner">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 message-fade-in">
-                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center text-3xl">🤖</div>
-                <h1 className="text-3xl font-bold tracking-tight">How can I help you?</h1>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                  {suggestions.map((s, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSend(s)}
-                      className="p-4 text-left rounded-xl border border-gray-200 dark:border-gray-800 hover:border-blue-500 dark:hover:border-blue-500 transition-all duration-200 group bg-white dark:bg-[#2d2d44]/50 shadow-sm"
-                    >
-                      <p className="text-sm font-medium group-hover:text-blue-500">{s}</p>
-                    </button>
+              <div className="welcome-screen">
+                <div className="welcome-icon">🤖</div>
+                <h1 className="welcome-title">How can I help you today?</h1>
+                <div className="suggestions-grid">
+                  {suggestions.map((s, i) => (
+                    <button key={i} className="suggestion-card" onClick={() => handleSend(s)}>{s}</button>
                   ))}
                 </div>
               </div>
             )}
 
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} message-fade-in`}>
-                <div className={`flex gap-4 w-full ${msg.role === 'user' ? 'max-w-[80%] flex-row-reverse' : 'max-w-none'}`}>
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-lg shadow-sm ${msg.role === 'user' ? 'bg-blue-600' : 'bg-green-600'}`}>
-                    {msg.role === 'user' ? '👤' : '🤖'}
-                  </div>
-                  <div className={`p-4 rounded-xl text-[15px] leading-relaxed w-full sm:w-auto ${
-                    msg.role === 'user' 
-                    ? 'bg-blue-500 text-white shadow-md' 
-                    : 'bg-white dark:bg-[#2d2d44] border border-gray-200 dark:border-gray-700 shadow-sm text-gray-800 dark:text-gray-100'
-                  }`}>
-                    <div className="prose dark:prose-invert max-w-none">
-                      {formatContent(msg.content)}
-                    </div>
-                    {idx === messages.length - 1 && isLoading && msg.role === 'assistant' && (
-                      <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse align-middle"></span>
+            {messages.map((msg, i) => (
+              <div key={i} className="message-row">
+                <div className={`message-avatar ${msg.role === 'user' ? 'user-avatar' : 'ai-avatar'}`}>
+                  {msg.role === 'user' ? '👤' : '🤖'}
+                </div>
+                <div className="message-body">
+                  <div className="message-role">{msg.role === 'user' ? 'You' : "Max's AI"}</div>
+                  <div className="message-content">
+                    {renderContent(msg.content)}
+                    {isLoading && i === messages.length - 1 && msg.role === 'assistant' && msg.content && (
+                      <span className="blink-cursor" />
                     )}
-                    <div className={`text-[9px] mt-2 opacity-50 uppercase font-bold tracking-wider ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      {msg.timestamp}
-                    </div>
                   </div>
+                  {isLoading && i === messages.length - 1 && msg.role === 'assistant' && !msg.content && (
+                    <div className="typing-dots">
+                      <div className="typing-dot" />
+                      <div className="typing-dot" />
+                      <div className="typing-dot" />
+                    </div>
+                  )}
+                  <div className="message-time">{msg.timestamp}</div>
                 </div>
               </div>
             ))}
-            
-            {isLoading && !messages[messages.length-1].content && (
-              <div className="flex justify-start message-fade-in">
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-md bg-green-600 flex items-center justify-center text-lg shadow-sm">🤖</div>
-                  <div className="flex items-center gap-1.5 p-4 bg-white dark:bg-[#2d2d44] border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm">
-                    <span className="dot-bounce"></span>
-                    <span className="dot-bounce"></span>
-                    <span className="dot-bounce"></span>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} className="h-40" />
+            <div ref={messagesEndRef} />
           </div>
-        </main>
+        </div>
 
-        {/* Input Area */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8 bg-gradient-to-t from-inherit via-inherit to-transparent z-40">
-          <div className="max-w-3xl mx-auto relative flex flex-col items-center">
-            
+        <div className="input-wrapper">
+          <div className="input-inner">
             {isLoading && (
-              <button 
-                onClick={handleStopGenerating}
-                className="mb-4 px-4 py-2 bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-bold shadow-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all flex items-center gap-2"
-              >
-                <div className="w-2 h-2 bg-red-500 rounded-sm"></div> Stop Generating
+              <button className="stop-btn" onClick={stopGenerating}>
+                <div className="stop-icon" /> Stop generating
               </button>
             )}
-
-            <div className="w-full relative shadow-xl rounded-2xl overflow-hidden group">
+            <div className="input-box">
               <textarea
+                ref={textareaRef}
+                className="input-textarea"
                 rows="1"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={autoResize}
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
                 placeholder="Message Max's AI..."
-                className="w-full p-4 pr-14 bg-white dark:bg-[#2d2d44] border border-gray-200 dark:border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all resize-none max-h-48 text-[15px] dark:text-gray-100"
               />
-              <button 
+              <button
+                className={`send-btn ${input.trim() && !isLoading ? 'active' : 'disabled'}`}
                 onClick={() => handleSend()}
                 disabled={isLoading || !input.trim()}
-                className="absolute right-3 bottom-3 p-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 transition-all active:scale-95"
               >
-                <span className="text-xl">➤</span>
+                ➤
               </button>
             </div>
-            <p className="mt-3 text-[10px] text-gray-400 font-medium tracking-wide">
-              Max's AI can make mistakes. Check important info.
-            </p>
+            <div className="disclaimer">Max's AI can make mistakes. Check important info.</div>
           </div>
         </div>
       </div>
