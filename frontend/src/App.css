@@ -1,25 +1,21 @@
+/* Global CSS for Max's AI */
+
 :root {
-  --primary-color: #3b82f6;
+  --primary: #3b82f6;
   --bg-light: #f8fafc;
   --bg-dark: #1a1a2e;
-  --text-light: #1e293b;
-  --text-dark: #f1f5f9;
 }
 
 body {
   margin: 0;
+  padding: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  overflow: hidden;
+  overflow: hidden; /* Prevent body scroll, use app container scroll */
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.message-fade-in {
-  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+#root {
+  width: 100vw;
+  height: 100vh;
 }
 
 /* Custom Scrollbar */
@@ -35,6 +31,16 @@ body {
 }
 .dark ::-webkit-scrollbar-thumb {
   background: #334155;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Typing Indicator */
@@ -55,22 +61,14 @@ body {
   40% { transform: translateY(-4px); opacity: 1; }
 }
 
-/* Textarea auto-resize (manual handle in JS but CSS base) */
+/* Ensure textarea doesn't look like a standard input box */
 textarea {
   min-height: 56px;
   line-height: 1.5;
+  resize: none;
 }
 
-/* Transitions */
-.transition-all {
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-/* Responsive Hide for Sidebar */
-@media (max-width: 1024px) {
-  .sidebar-hidden {
-    transform: translateX(-100%);
-  }
+/* Custom transitions for sidebar */
+.transition-transform {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
