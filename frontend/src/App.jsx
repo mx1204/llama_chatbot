@@ -1,3 +1,4 @@
+/* Max's AI - ChatGPT Interface v2 */
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
