@@ -20,7 +20,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'healthy', model: process.env.GROQ_MODEL });
+    res.json({ 
+        status: 'healthy', 
+        model: process.env.GROQ_MODEL,
+        hasApiKey: !!process.env.GROQ_API_KEY 
+    });
 });
 
 app.post('/chat', async (req, res) => {
