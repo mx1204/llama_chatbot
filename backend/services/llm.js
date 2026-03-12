@@ -5,10 +5,7 @@ dotenv.config();
 export async function* getStreamingResponse(messages, model, temperature = 0.7, maxTokens = 1024) {
     let modelId = model || process.env.GROQ_MODEL || 'llama-4-scout-17b-16e-instruct';
     
-    // Normalize model ID for Groq (removes HF prefix if present)
-    if (modelId.startsWith('meta-llama/')) {
-        modelId = modelId.replace('meta-llama/', '');
-    }
+    // Use the model ID as-is. Groq expects the full path for certain models like Llama 4.
 
     try {
         const response = await fetch(
