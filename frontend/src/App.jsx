@@ -66,8 +66,16 @@ function App() {
     try {
       const resp = await fetch(`${import.meta.env.VITE_API_URL}/documents`);
       const data = await resp.json();
-      setDocuments(data);
-    } catch (err) { console.error('Error fetching docs:', err); }
+      if (Array.isArray(data)) {
+        setDocuments(data);
+      } else {
+        console.error('Invalid documents data:', data);
+        setDocuments([]);
+      }
+    } catch (err) { 
+      console.error('Error fetching docs:', err); 
+      setDocuments([]);
+    }
   };
 
   const handleUpload = async (e) => {
