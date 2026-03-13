@@ -90,8 +90,7 @@ app.post('/chat', async (req, res) => {
             if (lastUserMessage) {
                 const chunks = await searchRelevantChunks(lastUserMessage.content);
                 if (chunks && chunks.length > 0) {
-                    context = "Relevant information from your documents:\n" + 
-                        chunks.map(c => `- ${c.text} (Source: ${c.source})`).join('\n');
+                    context = chunks.map(c => `[Source: ${c.source}]\n${c.text}`).join('\n---\n');
                     sources = [...new Set(chunks.map(c => c.source))];
                 }
             }

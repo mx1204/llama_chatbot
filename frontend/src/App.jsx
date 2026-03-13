@@ -1,6 +1,6 @@
-/* Max's AI - ChatGPT Interface v2 [Build 130127] */
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './App.css';
 
 function App() {
@@ -217,25 +217,6 @@ function App() {
     setInput(e.target.value);
   };
 
-  const renderContent = (content) => {
-    if (!content) return null;
-    const parts = content.split('```');
-    return parts.map((part, i) => {
-      if (i % 2 === 1) {
-        const lines = part.split('\n');
-        const lang = lines[0].trim();
-        const code = lines.slice(1).join('\n');
-        return (
-          <div key={i} className="code-block-wrapper">
-            <div className="code-block-header">{lang || 'code'}</div>
-            <pre className="code-block-content"><code>{code || lang}</code></pre>
-          </div>
-        );
-      }
-      return <span key={i}>{part}</span>;
-    });
-  };
-
   return (
     <div className={`app-wrapper ${darkMode ? 'dark' : 'light'}`}>
 
@@ -314,23 +295,23 @@ function App() {
                 <div className="message-body">
                   <div className="message-role">{msg.role === 'user' ? 'You' : "Max's AI"}</div>
                   <div className="message-content">
-                    {msg.role === 'user' ? (
-                      msg.content
-                    ) : (
-                      <ReactMarkdown
-                        components={{
-                          h1: ({children}) => <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "12px 0 8px" }}>{children}</h1>,
-                          h2: ({children}) => <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "10px 0 6px" }}>{children}</h2>,
-                          h3: ({children}) => <h3 style={{ fontSize: "16px", fontWeight: "bold", margin: "8px 0 4px" }}>{children}</h3>,
-                          strong: ({children}) => <strong style={{ fontWeight: "700" }}>{children}</strong>,
-                          em: ({children}) => <em style={{ fontStyle: "italic" }}>{children}</em>,
-                          p: ({children}) => <p style={{ margin: "6px 0" }}>{children}</p>,
-                          ul: ({children}) => <ul style={{ paddingLeft: "20px", margin: "6px 0" }}>{children}</ul>,
-                          ol: ({children}) => <ol style={{ paddingLeft: "20px", margin: "6px 0" }}>{children}</ol>,
-                          li: ({children}) => <li style={{ margin: "3px 0" }}>{children}</li>,
-                          code: ({children}) => (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ children }) => <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "12px 0 8px" }}>{children}</h1>,
+                        h2: ({ children }) => <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: "10px 0 6px" }}>{children}</h2>,
+                        h3: ({ children }) => <h3 style={{ fontSize: "16px", fontWeight: "bold", margin: "8px 0 4px" }}>{children}</h3>,
+                        strong: ({ children }) => <strong style={{ fontWeight: "700" }}>{children}</strong>,
+                        em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+                        p: ({ children }) => <p style={{ margin: "6px 0" }}>{children}</p>,
+                        ul: ({ children }) => <ul style={{ paddingLeft: "20px", margin: "6px 0" }}>{children}</ul>,
+                        ol: ({ children }) => <ol style={{ paddingLeft: "20px", margin: "6px 0" }}>{children}</ol>,
+                        li: ({ children }) => <li style={{ margin: "3px 0" }}>{children}</li>,
+                        code: ({ children, className }) => {
+                          const isInline = !className;
+                          return isInline ? (
                             <code style={{
-                              background: "#f0f0f0",
+                              background: darkMode ? "#3d3d3d" : "#f0f0f0",
                               padding: "2px 6px",
                               borderRadius: "4px",
                               fontSize: "13px",
@@ -338,25 +319,26 @@ function App() {
                             }}>
                               {children}
                             </code>
-                          ),
-                          pre: ({children}) => (
-                            <pre style={{
-                              background: "#1e1e1e",
-                              color: "#f8f8f2",
-                              padding: "12px",
-                              borderRadius: "8px",
-                              overflowX: "auto",
-                              fontSize: "13px",
-                              margin: "8px 0"
-                            }}>
-                              {children}
-                            </pre>
-                          ),
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                    )}
+                          ) : (
+                            <div className="code-block-wrapper">
+                              <div className="code-block-header">{className.replace('language-', '') || 'code'}</div>
+                              <pre className="code-block-content">
+                                <code>{children}</code>
+                              </pre>
+                            </div>
+                          );
+                        },
+                        table: ({ children }) => (
+                          <div style={{ overflowX: 'auto', margin: '12px 0' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>{children}</table>
+                          </div>
+                        ),
+                        th: ({ children }) => <th style={{ border: '1px solid rgba(0,0,0,0.1)', padding: '8px', background: 'rgba(0,0,0,0.05)', textAlign: 'left' }}>{children}</th>,
+                        td: ({ children }) => <td style={{ border: '1px solid rgba(0,0,0,0.1)', padding: '8px' }}>{children}</td>,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
                     {isLoading && i === messages.length - 1 && msg.role === 'assistant' && msg.content && (
                       <span className="blink-cursor" />
                     )}
