@@ -162,27 +162,60 @@ export async function extractTextFromPDF(buffer) {
 // 6. searchRelevantChunks
 export async function searchRelevantChunks(question, limit = 3) {
     const coll = await connectToMongoDB();
-    const queryEmbedding = await generateEmbedding(question);
 
-    const aggregationPipeline = [
-        {
-            $vectorSearch: {
-                index: 'vector_index',
-                path: 'embedding',
-                queryVector: queryEmbedding,
-                numCandidates: limit * 10,
-                limit: limit
+    // First try vector search (requires Atlas vector index)
+    try {
+        const queryEmbedding = await generateEmbedding(question);
+        const aggregationPipeline = [
+            {
+                $vectorSearch: {
+                    index: 'vector_index',
+                    path: 'embedding',
+                    queryVector: queryEmbedding,
+                    numCandidates: limit * 10,
+                    limit: limit
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    text: 1,
+                    source: 1,
+                    score: { $meta: 'vectorSearchScore' }
+                }
             }
-        },
-        {
-            $project: {
-                _id: 0,
-                text: 1,
-                source: 1,
-                score: { $meta: 'vectorSearchScore' }
-            }
+        ];
+        const results = await coll.aggregate(aggregationPipeline).toArray();
+        if (results && results.length > 0) {
+            console.log(`Vector search found ${results.length} chunks ✅`);
+            return results;
         }
-    ];
+    } catch (vectorErr) {
+        console.warn('Vector search failed, falling back to text search:', vectorErr.message);
+    }
 
-    return await coll.aggregate(aggregationPipeline).toArray();
+    // Fallback: simple keyword-based text search (works without vector index)
+    console.log('Using text fallback search...');
+    const words = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const regexParts = words.map(w => new RegExp(w, 'i'));
+
+    const results = await coll.find(
+        { $or: regexParts.map(r => ({ text: { $regex: r } })) }
+    )
+    .limit(limit)
+    .project({ _id: 0, text: 1, source: 1 })
+    .toArray();
+
+    // If no keyword match, just return the most recently added chunks
+    if (!results || results.length === 0) {
+        console.log('No keyword match — returning latest chunks...');
+        return await coll.find({})
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .project({ _id: 0, text: 1, source: 1 })
+            .toArray();
+    }
+
+    console.log(`Text fallback found ${results.length} chunks`);
+    return results;
 }
