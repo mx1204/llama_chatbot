@@ -25,6 +25,11 @@ function App() {
     const saved = localStorage.getItem('maxai_dark');
     return saved === 'true';
   });
+  
+  const [docPanelOpen, setDocPanelOpen] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   const messagesEndRef = useRef(null);
   const abortRef = useRef(null);
@@ -52,6 +57,58 @@ function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_API_URL}/documents`);
+      const data = await resp.json();
+      setDocuments(data);
+    } catch (err) { console.error('Error fetching docs:', err); }
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('pdf', file);
+    
+    setIsLoading(true);
+    setUploadStatus('Uploading...');
+    setUploadProgress(20);
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      setUploadProgress(100);
+      const data = await res.json();
+      if (data.success) {
+        setUploadStatus(`Success! ${data.chunks} chunks indexed.`);
+        fetchDocuments();
+      } else {
+        setUploadStatus('Upload failed.');
+      }
+    } catch (err) {
+      setUploadStatus('Error uploading file.');
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setUploadStatus(''); setUploadProgress(0); }, 3000);
+    }
+  };
+
+  const deleteDocument = async (fileName) => {
+    if (!confirm(`Delete ${fileName}?`)) return;
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL}/documents/${fileName}`, { method: 'DELETE' });
+      fetchDocuments();
+    } catch (err) { console.error('Delete error:', err); }
+  };
 
   const getTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -121,12 +178,16 @@ function App() {
           const data = line.slice(6);
           if (data === '[DONE]') break;
           try {
-            const { content } = JSON.parse(data);
+            const { content, sources } = JSON.parse(data);
             full += content;
             setSessions(prev => prev.map(s => {
               if (s.id !== currentSessionId) return s;
               const msgs = [...s.messages];
-              msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content: full };
+              msgs[msgs.length - 1] = { 
+                ...msgs[msgs.length - 1], 
+                content: full,
+                sources: sources || msgs[msgs.length - 1].sources 
+              };
               return { ...s, messages: msgs };
             }));
           } catch (_) {}
@@ -221,9 +282,15 @@ function App() {
             <span className="header-title">Max's AI</span>
           </div>
           <div className="header-right">
+            <button className="docs-toggle-btn" onClick={() => setDocPanelOpen(!docPanelOpen)}>
+              📚 Documents
+            </button>
             <span className="model-badge">Llama 4 Scout</span>
           </div>
         </header>
+
+        <div className="main-content-row">
+          <div className="chat-and-input">
 
         <div className="messages-container">
           <div className="messages-inner">
@@ -301,6 +368,14 @@ function App() {
                       <div className="typing-dot" />
                     </div>
                   )}
+                  {msg.sources && msg.sources.length > 0 && (
+                    <div className="message-sources">
+                      <div className="sources-label">📄 Sources:</div>
+                      <div className="sources-list">
+                        {msg.sources.map(src => <span key={src} className="source-tag">{src}</span>)}
+                      </div>
+                    </div>
+                  )}
                   <div className="message-time">{msg.timestamp}</div>
                 </div>
               </div>
@@ -339,7 +414,47 @@ function App() {
           </div>
         </div>
       </div>
+
+        {docPanelOpen && (
+          <aside className="docs-panel">
+            <div className="docs-panel-header">
+              <h3>Document Management</h3>
+              <button onClick={() => setDocPanelOpen(false)}>✕</button>
+            </div>
+            
+            <div className="upload-section">
+              <label className="upload-dropzone">
+                <input type="file" accept=".pdf" onChange={handleUpload} style={{ display: 'none' }} />
+                <div className="upload-icon">📄</div>
+                <p>Drop PDF here or click to upload</p>
+              </label>
+              
+              {uploadProgress > 0 && (
+                <div className="progress-container">
+                  <div className="progress-bar" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              )}
+              {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
+            </div>
+
+            <div className="docs-list">
+              <h4>Uploaded Documents</h4>
+              {documents.length === 0 ? (
+                <p className="empty-docs">No documents yet.</p>
+              ) : (
+                documents.map(doc => (
+                  <div key={doc} className="doc-item">
+                    <span title={doc}>{doc}</span>
+                    <button onClick={() => deleteDocument(doc)}>🗑️</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
+  </div>
   );
 }
 

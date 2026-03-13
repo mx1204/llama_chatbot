@@ -655,3 +655,128 @@
     padding: 0 12px 16px;
   }
 }
+
+/* --- RAG UI --- */
+.docs-toggle-btn {
+  background: rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: inherit;
+  transition: all 0.2s;
+}
+.dark .docs-toggle-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+.docs-toggle-btn:hover { background: rgba(0,0,0,0.1); }
+.dark .docs-toggle-btn:hover { background: rgba(255,255,255,0.15); }
+
+.main-content-row {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chat-and-input {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.docs-panel {
+  width: 300px;
+  background: #f9f9f9;
+  border-left: 1px solid rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease;
+}
+.dark .docs-panel { background: #171717; border-left-color: rgba(255,255,255,0.08); }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.docs-panel-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.docs-panel-header h3 { font-size: 16px; }
+.docs-panel-header button { background: none; border: none; font-size: 18px; cursor: pointer; color: inherit; }
+
+.upload-section {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 2px dashed rgba(0,0,0,0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.dark .upload-dropzone { border-color: rgba(255,255,255,0.1); }
+.upload-dropzone:hover { background: rgba(0,0,0,0.02); border-color: #1a73e8; }
+.dark .upload-dropzone:hover { background: rgba(255,255,255,0.02); border-color: #8ab4f8; }
+
+.upload-icon { font-size: 32px; margin-bottom: 8px; }
+.upload-dropzone p { font-size: 13px; opacity: 0.7; }
+
+.progress-container {
+  height: 4px;
+  background: rgba(0,0,0,0.05);
+  border-radius: 2px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.progress-bar { height: 100%; background: #1a73e8; transition: width 0.3s ease; }
+
+.upload-status { font-size: 12px; margin-top: 8px; text-align: center; color: #10b981; }
+
+.docs-list { flex: 1; overflow-y: auto; padding: 16px; }
+.docs-list h4 { font-size: 12px; text-transform: uppercase; opacity: 0.5; margin-bottom: 12px; letter-spacing: 0.05em; }
+
+.doc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: white;
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.dark .doc-item { background: #212121; border-color: rgba(255,255,255,0.05); }
+
+.doc-item span { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; padding-right: 8px; }
+.doc-item button { background: none; border: none; cursor: pointer; opacity: 0.5; transition: opacity 0.2s; }
+.doc-item button:hover { opacity: 1; }
+
+/* Message Sources */
+.message-sources {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0,0,0,0.05);
+}
+.sources-label { font-size: 12px; font-weight: 700; margin-bottom: 6px; opacity: 0.8; }
+.sources-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.source-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.05);
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+.dark .source-tag { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }

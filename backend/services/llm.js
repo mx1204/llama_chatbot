@@ -2,12 +2,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export async function* getStreamingResponse(messages, model, temperature = 0.7, maxTokens = 1024) {
+export async function* getStreamingResponse(messages, model, temperature = 0.7, maxTokens = 1024, context = '') {
     let modelId = model || process.env.GROQ_MODEL || 'llama-4-scout-17b-16e-instruct';
     
     // Use the model ID as-is. Groq expects the full path for certain models like Llama 4.
 
-    const SYSTEM_PROMPT = `You are a helpful AI assistant.
+    let systemContent = `You are a helpful AI assistant.
 Always format your responses using markdown:
 - Use **bold** for important terms and key points
 - Use ## for main section headings
@@ -18,6 +18,10 @@ Always format your responses using markdown:
 Write naturally and never mention, explain,
 or show markdown syntax to the user.
 Just use it silently to format your response.`;
+
+    if (context) {
+        systemContent += `\n\nUse this context to answer if relevant:\n[context]\n${context}\nIf context is not relevant, use your general knowledge.`;
+    }
 
     try {
         const response = await fetch(
@@ -31,7 +35,7 @@ Just use it silently to format your response.`;
                 body: JSON.stringify({
                     model: modelId,
                     messages: [
-                        { role: 'system', content: SYSTEM_PROMPT },
+                        { role: 'system', content: systemContent },
                         ...messages
                     ],
                     max_tokens: maxTokens,
