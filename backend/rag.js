@@ -1,6 +1,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const pdfParse = require('pdf-parse');
+const pdf = pdfParse.default || pdfParse;
 
 import { MongoClient } from 'mongodb';
 import Tesseract from 'tesseract.js';
@@ -78,7 +79,12 @@ export async function indexDocument(text, fileName) {
 // 5. extractTextFromPDF
 export async function extractTextFromPDF(buffer) {
     try {
-        const data = await pdf(buffer);
+        // Ensure buffer is correct type
+        const pdfBuffer = Buffer.isBuffer(buffer) 
+            ? buffer 
+            : Buffer.from(buffer);
+        
+        const data = await pdf(pdfBuffer);
         let text = data.text.trim();
 
         if (text.length < 100) {
