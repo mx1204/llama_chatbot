@@ -1,17 +1,47 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
-const pdf = pdfParse.default || pdfParse;
 
 import { MongoClient } from 'mongodb';
 import Tesseract from 'tesseract.js';
 import { pipeline } from '@xenova/transformers';
 import dotenv from 'dotenv';
+import PDFParser from 'pdf2json';
+
 dotenv.config();
 
 let dbClient;
 let collection;
 let embedder;
+
+// ── PDF Text Extraction using pdf2json ─────────────
+function extractTextWithPdf2json(buffer) {
+    return new Promise((resolve, reject) => {
+        const pdfParser = new PDFParser();
+
+        pdfParser.on('pdfParser_dataReady', (pdfData) => {
+            try {
+                // Extract all text from all pages
+                const text = pdfData.Pages
+                    .map(page =>
+                        page.Texts
+                            .map(t => decodeURIComponent(t.R[0].T))
+                            .join(' ')
+                    )
+                    .join('\n');
+                resolve(text);
+            } catch (e) {
+                reject(e);
+            }
+        });
+
+        pdfParser.on('pdfParser_dataError', (err) => {
+            reject(new Error(err.parserError));
+        });
+
+        // Parse from buffer
+        pdfParser.parseBuffer(buffer);
+    });
+}
 
 // 1. connectToMongoDB
 export async function connectToMongoDB() {
@@ -34,7 +64,7 @@ export function splitIntoChunks(text, chunkSize = 500, overlap = 50) {
     const chunks = [];
     let start = 0;
     while (start < text.length) {
-        let end = start + chunkSize;
+        const end = start + chunkSize;
         chunks.push(text.slice(start, end));
         start = end - overlap;
     }
@@ -44,10 +74,12 @@ export function splitIntoChunks(text, chunkSize = 500, overlap = 50) {
 // 3. generateEmbedding
 export async function generateEmbedding(text) {
     if (!embedder) {
+        console.log('Loading embedding model...');
         embedder = await pipeline(
             'feature-extraction',
             'Xenova/all-MiniLM-L6-v2'
         );
+        console.log('Embedding model loaded ✅');
     }
     const output = await embedder(text, {
         pooling: 'mean',
@@ -63,6 +95,8 @@ export async function indexDocument(text, fileName) {
     const createdAt = new Date();
     let totalChunks = 0;
 
+    console.log(`Indexing ${chunks.length} chunks for ${fileName}...`);
+
     for (const chunk of chunks) {
         const embedding = await generateEmbedding(chunk);
         await coll.insertOne({
@@ -73,32 +107,55 @@ export async function indexDocument(text, fileName) {
         });
         totalChunks++;
     }
+
+    console.log(`Indexed ${totalChunks} chunks for ${fileName} ✅`);
     return totalChunks;
 }
 
 // 5. extractTextFromPDF
 export async function extractTextFromPDF(buffer) {
     try {
-        // Ensure buffer is correct type
-        const pdfBuffer = Buffer.isBuffer(buffer) 
-            ? buffer 
-            : Buffer.from(buffer);
-        
-        const data = await pdf(pdfBuffer);
-        let text = data.text.trim();
+        console.log('Extracting text from PDF...');
 
+        // Ensure it is a proper Buffer
+        const pdfBuffer = Buffer.isBuffer(buffer)
+            ? buffer
+            : Buffer.from(buffer);
+
+        // Try pdf2json first
+        let text = await extractTextWithPdf2json(pdfBuffer);
+        text = text.trim();
+
+        console.log(`Extracted ${text.length} characters from PDF`);
+
+        // If too short fall back to OCR
         if (text.length < 100) {
-            console.log('PDF text sparse — falling back to OCR...');
+            console.log('Text too short — falling back to OCR...');
+            const { data: { text: ocrText } } = await Tesseract.recognize(
+                pdfBuffer,
+                'eng'
+            );
+            text = ocrText.trim();
+            console.log(`OCR extracted ${text.length} characters`);
+        }
+
+        return text;
+
+    } catch (error) {
+        console.error('PDF Extraction Error:', error.message);
+
+        // Last resort — try OCR directly
+        try {
+            console.log('Trying OCR as last resort...');
             const { data: { text: ocrText } } = await Tesseract.recognize(
                 buffer,
                 'eng'
             );
-            text = ocrText.trim();
+            return ocrText.trim();
+        } catch (ocrError) {
+            console.error('OCR also failed:', ocrError.message);
+            throw new Error('Could not extract text from PDF');
         }
-        return text;
-    } catch (error) {
-        console.error('PDF Extraction Error:', error);
-        throw error;
     }
 }
 
